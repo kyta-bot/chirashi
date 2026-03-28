@@ -16,6 +16,21 @@
   }
   header h1 { font-size: 1.2rem; font-weight: bold; }
   header p  { font-size: 0.8rem; opacity: 0.85; margin-top: 4px; }
+
+  /* タブ */
+  .tabs {
+    display: flex; background: white;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .tab {
+    flex: 1; padding: 12px 0; text-align: center;
+    font-size: 0.9rem; font-weight: bold;
+    color: #999; cursor: pointer; border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+  }
+  .tab.active { color: #2d7d46; border-bottom-color: #2d7d46; }
+
+  /* 検索タブ */
   .search-box {
     background: white; padding: 16px 20px;
     display: flex; gap: 8px;
@@ -41,7 +56,9 @@
     font-size: 0.85rem; cursor: pointer;
     border: 1px solid #c3e6cb;
   }
-  #results { padding: 12px 16px; }
+
+  /* 共通カード */
+  #results, #today-list { padding: 12px 16px; }
   .date-badge {
     text-align: center; font-size: 0.8rem;
     color: #888; margin-bottom: 12px;
@@ -60,13 +77,11 @@
   .section-label {
     font-size: 0.75rem; color: #888;
     padding: 6px 16px 4px;
-    border-top: 1px solid #f0f0f0;
-    font-weight: bold;
+    border-top: 1px solid #f0f0f0; font-weight: bold;
   }
   .product-row {
     padding: 10px 16px; display: flex;
-    justify-content: space-between;
-    align-items: center;
+    justify-content: space-between; align-items: center;
     border-top: 1px solid #f5f5f5; gap: 8px;
   }
   .product-name { font-size: 0.95rem; flex: 1; }
@@ -96,6 +111,10 @@
   }
   .empty .icon { font-size: 3rem; margin-bottom: 12px; }
   .loading { text-align: center; padding: 48px 20px; color: #888; }
+  .count-badge {
+    margin-left: auto; background: #2d7d46; color: white;
+    font-size: 0.75rem; padding: 2px 8px; border-radius: 10px;
+  }
 </style>
 </head>
 <body>
@@ -105,24 +124,38 @@
   <p>タイヨー・ブランデ・カスミ 学園の森エリア</p>
 </header>
 
-<div class="search-box">
-  <input type="text" id="searchInput" placeholder="例：レタス、鶏もも肉、たまご" />
-  <button onclick="doSearch()">検索</button>
+<!-- タブ -->
+<div class="tabs">
+  <div class="tab active" id="tab-today" onclick="switchTab('today')">📋 今日のチラシ</div>
+  <div class="tab" id="tab-search" onclick="switchTab('search')">🔍 商品検索</div>
 </div>
 
-<div class="suggestions">
-  <span onclick="quickSearch('たまご')">たまご</span>
-  <span onclick="quickSearch('レタス')">レタス</span>
-  <span onclick="quickSearch('鶏もも')">鶏もも</span>
-  <span onclick="quickSearch('まぐろ')">まぐろ</span>
-  <span onclick="quickSearch('豚')">豚肉</span>
-  <span onclick="quickSearch('牛乳')">牛乳</span>
+<!-- 今日のチラシ画面 -->
+<div id="pane-today">
+  <div id="today-list">
+    <div class="loading">読み込み中...</div>
+  </div>
 </div>
 
-<div id="results">
-  <div class="empty">
-    <div class="icon">🔍</div>
-    <p>商品名を入力して検索してください</p>
+<!-- 検索画面 -->
+<div id="pane-search" style="display:none">
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="例：レタス、鶏もも肉、たまご" />
+    <button onclick="doSearch()">検索</button>
+  </div>
+  <div class="suggestions">
+    <span onclick="quickSearch('たまご')">たまご</span>
+    <span onclick="quickSearch('レタス')">レタス</span>
+    <span onclick="quickSearch('鶏もも')">鶏もも</span>
+    <span onclick="quickSearch('まぐろ')">まぐろ</span>
+    <span onclick="quickSearch('豚')">豚肉</span>
+    <span onclick="quickSearch('牛乳')">牛乳</span>
+  </div>
+  <div id="results">
+    <div class="empty">
+      <div class="icon">🔍</div>
+      <p>商品名を入力して検索してください</p>
+    </div>
   </div>
 </div>
 
@@ -136,11 +169,69 @@ const STORE_COLORS = {
   "カスミ学園の森店":   { color: "#8e44ad", bg: "#f5eef8" },
 };
 const STORE_ORDER = ["タイヨー学園の森店", "ブランデ研究学園店", "カスミ学園の森店"];
-
 const today = new Date().toISOString().slice(0, 10);
 const ago30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+const H = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
 
+// ── タブ切替 ──
+function switchTab(name) {
+  document.getElementById("pane-today").style.display  = name === "today"  ? "" : "none";
+  document.getElementById("pane-search").style.display = name === "search" ? "" : "none";
+  document.getElementById("tab-today").classList.toggle("active",  name === "today");
+  document.getElementById("tab-search").classList.toggle("active", name === "search");
+}
+
+// ── 今日のチラシ一覧 ──
+async function loadToday() {
+  const el = document.getElementById("today-list");
+  try {
+    const data = await fetch(
+      `${SUPABASE_URL}/rest/v1/prices?select=store,item,price_tax,price_notax,unit,note&date=eq.${today}&order=store,price_tax`,
+      { headers: H }
+    ).then(r => r.json());
+
+    if (!data.length) {
+      el.innerHTML = `<div class="empty"><div class="icon">📭</div><p>今日のデータはまだありません</p><p style="font-size:0.8rem;margin-top:8px;color:#bbb">scraper.pyを実行してください</p></div>`;
+      return;
+    }
+
+    const byStore = {};
+    for (const r of data) { (byStore[r.store] = byStore[r.store] || []).push(r); }
+
+    let html = `<div class="date-badge">${today}（${data.length}品）</div>`;
+    for (const store of STORE_ORDER) {
+      const items = byStore[store];
+      if (!items) continue;
+      const c = STORE_COLORS[store] || { color: "#555", bg: "#f5f5f5" };
+      html += `<div class="store-card">
+        <div class="store-header" style="background:${c.bg}">
+          <span class="dot" style="background:${c.color}"></span>
+          ${store}
+          <span class="count-badge">${items.length}品</span>
+        </div>`;
+      for (const r of items) {
+        html += `<div class="product-row">
+          <div>
+            <div class="product-name">${r.item}${r.note ? ` <span class="product-note">${r.note}</span>` : ""}</div>
+            ${r.unit ? `<div class="product-unit">${r.unit}</div>` : ""}
+          </div>
+          <div class="product-price">
+            ${r.price_tax   ? `<div class="price-tax">税込${r.price_tax}円</div>` : ""}
+            ${r.price_notax ? `<div class="price-notax">税抜${r.price_notax}円</div>` : ""}
+          </div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>読み込みに失敗しました</p></div>`;
+  }
+}
+
+// ── 検索 ──
 function quickSearch(kw) {
+  switchTab("search");
   document.getElementById("searchInput").value = kw;
   doSearch();
 }
@@ -155,29 +246,26 @@ async function doSearch() {
   const el = document.getElementById("results");
   el.innerHTML = `<div class="loading">検索中...</div>`;
   try {
-    const h = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
     const [t, s] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/prices?select=store,item,price_tax,price_notax,unit,note&item=ilike.*${encodeURIComponent(kw)}*&date=eq.${today}`, {headers: h}).then(r => r.json()),
-      fetch(`${SUPABASE_URL}/rest/v1/prices?select=store,price_tax,date&item=ilike.*${encodeURIComponent(kw)}*&date=gte.${ago30}&price_tax=not.is.null`, {headers: h}).then(r => r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/prices?select=store,item,price_tax,price_notax,unit,note&item=ilike.*${encodeURIComponent(kw)}*&date=eq.${today}`, {headers:H}).then(r=>r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/prices?select=store,price_tax,date&item=ilike.*${encodeURIComponent(kw)}*&date=gte.${ago30}&price_tax=not.is.null`, {headers:H}).then(r=>r.json()),
     ]);
-    renderResults(kw, t, s);
+    renderSearch(kw, t, s);
   } catch(e) {
     el.innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>取得に失敗しました</p></div>`;
   }
 }
 
-function renderResults(kw, todayData, histData) {
+function renderSearch(kw, todayData, histData) {
   const el = document.getElementById("results");
   const todayMap = {}, statsMap = {};
   for (const r of todayData) { (todayMap[r.store] = todayMap[r.store] || []).push(r); }
   for (const r of histData)  { (statsMap[r.store] = statsMap[r.store] || []).push(r.price_tax); }
-
   const active = STORE_ORDER.filter(s => todayMap[s] || statsMap[s]);
   if (!active.length) {
     el.innerHTML = `<div class="empty"><div class="icon">😔</div><p>「${kw}」は見つかりませんでした</p></div>`;
     return;
   }
-
   let html = `<div class="date-badge">今日 ${today} の情報</div>`;
   for (const store of active) {
     const c = STORE_COLORS[store] || { color: "#555", bg: "#f5f5f5" };
@@ -196,7 +284,7 @@ function renderResults(kw, todayData, histData) {
             ${r.unit ? `<div class="product-unit">${r.unit}</div>` : ""}
           </div>
           <div class="product-price">
-            ${r.price_tax ? `<span class="price-tax">税込${r.price_tax}円</span>` : ""}
+            ${r.price_tax   ? `<div class="price-tax">税込${r.price_tax}円</div>` : ""}
             ${r.price_notax ? `<div class="price-notax">税抜${r.price_notax}円</div>` : ""}
           </div>
         </div>`;
@@ -219,6 +307,9 @@ function renderResults(kw, todayData, histData) {
   }
   el.innerHTML = html;
 }
+
+// 起動時に今日のチラシを読み込む
+loadToday();
 </script>
 </body>
 </html>
