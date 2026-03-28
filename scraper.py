@@ -3,6 +3,7 @@ scraper.py
 トクバイから3店舗の特売情報を取得してSupabaseに保存する
 """
 
+import os
 import re
 import time
 from datetime import date
@@ -11,10 +12,10 @@ import requests
 from bs4 import BeautifulSoup
 
 # ──────────────────────────────────────────
-# Supabase設定
+# Supabase設定（環境変数から読む）
 # ──────────────────────────────────────────
-SUPABASE_URL = "https://wydjiqortlsvbtwswckd.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5ZGppcW9ydGxzdmJ0d3N3Y2tkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NzYxOTIsImV4cCI6MjA5MDI1MjE5Mn0.8PLeUVhuUzMMTySqfinhr6Ne1UJpp_SqvSDATmAck1k"
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
 HEADERS_SUPA = {
     "apikey": SUPABASE_KEY,
