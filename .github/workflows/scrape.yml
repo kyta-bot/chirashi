@@ -1,0 +1,23 @@
+name: 毎朝チラシ取得
+
+on:
+  schedule:
+    - cron: '0 23 * * *'  # 日本時間 毎朝8時
+  workflow_dispatch:        # 手動実行ボタンも使える
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python設定
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: ライブラリインストール
+        run: pip install requests beautifulsoup4
+
+      - name: チラシ取得
+        run: python scraper.py
