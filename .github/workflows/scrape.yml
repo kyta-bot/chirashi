@@ -2,8 +2,8 @@ name: 毎朝チラシ取得
 
 on:
   schedule:
-    - cron: '0 23 * * *'  # 日本時間 毎朝8時
-  workflow_dispatch:        # 手動実行ボタンも使える
+    - cron: '0 23 * * *'
+  workflow_dispatch:
 
 jobs:
   scrape:
@@ -20,4 +20,7 @@ jobs:
         run: pip install requests beautifulsoup4
 
       - name: チラシ取得
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper.py
