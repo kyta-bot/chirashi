@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>チラシ価格検索</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    background: #f5f5f5; color: #333; min-height: 100vh;
+  }
+  header {
+    background: #2d7d46; color: white;
+    padding: 16px 20px; text-align: center;
+  }
+  header h1 { font-size: 1.2rem; font-weight: bold; }
+  header p  { font-size: 0.8rem; opacity: 0.85; margin-top: 4px; }
+  .search-box {
+    background: white; padding: 16px 20px;
+    display: flex; gap: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  }
+  .search-box input {
+    flex: 1; padding: 12px 14px;
+    border: 2px solid #ddd; border-radius: 8px;
+    font-size: 1rem; outline: none;
+  }
+  .search-box input:focus { border-color: #2d7d46; }
+  .search-box button {
+    padding: 12px 20px; background: #2d7d46;
+    color: white; border: none; border-radius: 8px;
+    font-size: 1rem; font-weight: bold; cursor: pointer;
+  }
+  .suggestions {
+    padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .suggestions span {
+    background: #e8f5ec; color: #2d7d46;
+    padding: 6px 12px; border-radius: 20px;
+    font-size: 0.85rem; cursor: pointer;
+    border: 1px solid #c3e6cb;
+  }
+  #results { padding: 12px 16px; }
+  .date-badge {
+    text-align: center; font-size: 0.8rem;
+    color: #888; margin-bottom: 12px;
+  }
+  .store-card {
+    background: white; border-radius: 12px;
+    margin-bottom: 14px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .store-header {
+    padding: 12px 16px; font-weight: bold;
+    font-size: 0.95rem; display: flex;
+    align-items: center; gap: 8px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .section-label {
+    font-size: 0.75rem; color: #888;
+    padding: 6px 16px 4px;
+    border-top: 1px solid #f0f0f0;
+    font-weight: bold;
+  }
+  .product-row {
+    padding: 10px 16px; display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #f5f5f5; gap: 8px;
+  }
+  .product-name { font-size: 0.95rem; flex: 1; }
+  .product-unit { font-size: 0.75rem; color: #999; }
+  .product-note {
+    font-size: 0.7rem; background: #fff3cd;
+    color: #856404; padding: 2px 6px;
+    border-radius: 4px; white-space: nowrap;
+  }
+  .product-price { text-align: right; white-space: nowrap; }
+  .price-tax { font-size: 1.1rem; font-weight: bold; color: #c0392b; }
+  .price-notax { font-size: 0.75rem; color: #999; }
+  .stats-row {
+    padding: 10px 16px; background: #f9f9f9;
+    font-size: 0.82rem; color: #666;
+    border-top: 1px solid #f0f0f0;
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .stats-row .min { color: #2d7d46; font-weight: bold; }
+  .stats-row .max { color: #c0392b; }
+  .no-today {
+    padding: 10px 16px; color: #aaa;
+    font-size: 0.85rem; border-top: 1px solid #f5f5f5;
+  }
+  .empty {
+    text-align: center; padding: 48px 20px; color: #aaa;
+  }
+  .empty .icon { font-size: 3rem; margin-bottom: 12px; }
+  .loading { text-align: center; padding: 48px 20px; color: #888; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛒 チラシ価格検索</h1>
+  <p>タイヨー・ブランデ・カスミ 学園の森エリア</p>
+</header>
+
+<div class="search-box">
+  <input type="text" id="searchInput" placeholder="例：レタス、鶏もも肉、たまご" />
+  <button onclick="doSearch()">検索</button>
+</div>
+
+<div class="suggestions">
+  <span onclick="quickSearch('たまご')">たまご</span>
+  <span onclick="quickSearch('レタス')">レタス</span>
+  <span onclick="quickSearch('鶏もも')">鶏もも</span>
+  <span onclick="quickSearch('まぐろ')">まぐろ</span>
+  <span onclick="quickSearch('豚')">豚肉</span>
+  <span onclick="quickSearch('牛乳')">牛乳</span>
+</div>
+
+<div id="results">
+  <div class="empty">
+    <div class="icon">🔍</div>
+    <p>商品名を入力して検索してください</p>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://wydjiqortlsvbtwswckd.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5ZGppcW9ydGxzdmJ0d3N3Y2tkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NzYxOTIsImV4cCI6MjA5MDI1MjE5Mn0.8PLeUVhuUzMMTySqfinhr6Ne1UJpp_SqvSDATmAck1k";
+
+const STORE_COLORS = {
+  "タイヨー学園の森店": { color: "#e74c3c", bg: "#fdf0ef" },
+  "ブランデ研究学園店": { color: "#2980b9", bg: "#eaf4fb" },
+  "カスミ学園の森店":   { color: "#8e44ad", bg: "#f5eef8" },
+};
+const STORE_ORDER = ["タイヨー学園の森店", "ブランデ研究学園店", "カスミ学園の森店"];
+
+const today = new Date().toISOString().slice(0, 10);
+const ago30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+
+function quickSearch(kw) {
+  document.getElementById("searchInput").value = kw;
+  doSearch();
+}
+
+document.getElementById("searchInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") doSearch();
+});
+
+async function doSearch() {
+  const kw = document.getElementById("searchInput").value.trim();
+  if (!kw) return;
+  const el = document.getElementById("results");
+  el.innerHTML = `<div class="loading">検索中...</div>`;
+  try {
+    const h = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+    const [t, s] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/prices?select=store,item,price_tax,price_notax,unit,note&item=ilike.*${encodeURIComponent(kw)}*&date=eq.${today}`, {headers: h}).then(r => r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/prices?select=store,price_tax,date&item=ilike.*${encodeURIComponent(kw)}*&date=gte.${ago30}&price_tax=not.is.null`, {headers: h}).then(r => r.json()),
+    ]);
+    renderResults(kw, t, s);
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>取得に失敗しました</p></div>`;
+  }
+}
+
+function renderResults(kw, todayData, histData) {
+  const el = document.getElementById("results");
+  const todayMap = {}, statsMap = {};
+  for (const r of todayData) { (todayMap[r.store] = todayMap[r.store] || []).push(r); }
+  for (const r of histData)  { (statsMap[r.store] = statsMap[r.store] || []).push(r.price_tax); }
+
+  const active = STORE_ORDER.filter(s => todayMap[s] || statsMap[s]);
+  if (!active.length) {
+    el.innerHTML = `<div class="empty"><div class="icon">😔</div><p>「${kw}」は見つかりませんでした</p></div>`;
+    return;
+  }
+
+  let html = `<div class="date-badge">今日 ${today} の情報</div>`;
+  for (const store of active) {
+    const c = STORE_COLORS[store] || { color: "#555", bg: "#f5f5f5" };
+    const items = todayMap[store] || [];
+    const prices = statsMap[store] || [];
+    html += `<div class="store-card">
+      <div class="store-header" style="background:${c.bg}">
+        <span class="dot" style="background:${c.color}"></span>${store}
+      </div>
+      <div class="section-label">今日の特売</div>`;
+    if (items.length) {
+      for (const r of items) {
+        html += `<div class="product-row">
+          <div>
+            <div class="product-name">${r.item}${r.note ? ` <span class="product-note">${r.note}</span>` : ""}</div>
+            ${r.unit ? `<div class="product-unit">${r.unit}</div>` : ""}
+          </div>
+          <div class="product-price">
+            ${r.price_tax ? `<span class="price-tax">税込${r.price_tax}円</span>` : ""}
+            ${r.price_notax ? `<div class="price-notax">税抜${r.price_notax}円</div>` : ""}
+          </div>
+        </div>`;
+      }
+    } else {
+      html += `<div class="no-today">本日の特売情報はありません</div>`;
+    }
+    if (prices.length) {
+      const min = Math.min(...prices), max = Math.max(...prices);
+      const avg = Math.round(prices.reduce((a,b)=>a+b,0)/prices.length);
+      const days = new Set(histData.filter(r=>r.store===store).map(r=>r.date)).size;
+      html += `<div class="section-label">直近30日の相場（${days}日分）</div>
+        <div class="stats-row">
+          <span class="min">最安 ${min}円</span>
+          <span class="max">最高 ${max}円</span>
+          <span>平均 ${avg}円</span>
+        </div>`;
+    }
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+}
+</script>
+</body>
+</html>
