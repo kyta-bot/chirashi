@@ -21,16 +21,18 @@
   .tabs {
     display: flex; background: white;
     border-bottom: 2px solid #e0e0e0;
+    overflow-x: auto;
   }
   .tab {
-    flex: 1; padding: 12px 0; text-align: center;
-    font-size: 0.9rem; font-weight: bold;
-    color: #999; cursor: pointer; border-bottom: 3px solid transparent;
-    margin-bottom: -2px;
+    flex: 1; min-width: 80px; padding: 12px 4px;
+    text-align: center; font-size: 0.8rem; font-weight: bold;
+    color: #999; cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px; white-space: nowrap;
   }
   .tab.active { color: #2d7d46; border-bottom-color: #2d7d46; }
 
-  /* 検索タブ */
+  /* 検索 */
   .search-box {
     background: white; padding: 16px 20px;
     display: flex; gap: 8px;
@@ -58,7 +60,7 @@
   }
 
   /* 共通カード */
-  #results, #today-list { padding: 12px 16px; }
+  #results, #today-list, #flyer-list { padding: 12px 16px; }
   .date-badge {
     text-align: center; font-size: 0.8rem;
     color: #888; margin-bottom: 12px;
@@ -115,29 +117,75 @@
     margin-left: auto; background: #2d7d46; color: white;
     font-size: 0.75rem; padding: 2px 8px; border-radius: 10px;
   }
+
+  /* チラシ画像 */
+  .flyer-store-section { margin-bottom: 20px; }
+  .flyer-store-title {
+    font-size: 0.95rem; font-weight: bold;
+    padding: 10px 16px; display: flex;
+    align-items: center; gap: 8px;
+    border-radius: 10px 10px 0 0;
+  }
+  .flyer-images {
+    display: flex; gap: 10px;
+    overflow-x: auto; padding: 12px 16px;
+    background: white;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .flyer-images img {
+    height: 200px; width: auto;
+    border-radius: 6px; border: 1px solid #eee;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .flyer-valid {
+    font-size: 0.75rem; color: #888;
+    padding: 0 16px 10px;
+    background: white;
+  }
+  .no-flyer {
+    padding: 16px; color: #aaa; font-size: 0.85rem;
+    background: white; border-radius: 0 0 10px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  /* モーダル */
+  .modal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); z-index: 100;
+    justify-content: center; align-items: center;
+    padding: 20px;
+  }
+  .modal.open { display: flex; }
+  .modal img { max-width: 100%; max-height: 90vh; border-radius: 8px; }
+  .modal-close {
+    position: absolute; top: 16px; right: 16px;
+    color: white; font-size: 2rem; cursor: pointer;
+    background: rgba(0,0,0,0.5); border-radius: 50%;
+    width: 40px; height: 40px; display: flex;
+    align-items: center; justify-content: center;
+  }
 </style>
 </head>
 <body>
 
 <header>
   <h1>🛒 チラシ価格検索</h1>
-  <p>タイヨー・ブランデ・カスミ 学園の森エリア</p>
+  <p>学園の森エリア スーパー情報</p>
 </header>
 
-<!-- タブ -->
 <div class="tabs">
-  <div class="tab active" id="tab-today" onclick="switchTab('today')">📋 今日のチラシ</div>
-  <div class="tab" id="tab-search" onclick="switchTab('search')">🔍 商品検索</div>
+  <div class="tab active" id="tab-today"  onclick="switchTab('today')">📋 今日の特売</div>
+  <div class="tab"        id="tab-search" onclick="switchTab('search')">🔍 価格検索</div>
+  <div class="tab"        id="tab-flyer"  onclick="switchTab('flyer')">🗞 チラシ画像</div>
 </div>
 
-<!-- 今日のチラシ画面 -->
+<!-- 今日の特売 -->
 <div id="pane-today">
-  <div id="today-list">
-    <div class="loading">読み込み中...</div>
-  </div>
+  <div id="today-list"><div class="loading">読み込み中...</div></div>
 </div>
 
-<!-- 検索画面 -->
+<!-- 価格検索 -->
 <div id="pane-search" style="display:none">
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="例：レタス、鶏もも肉、たまご" />
@@ -152,11 +200,19 @@
     <span onclick="quickSearch('牛乳')">牛乳</span>
   </div>
   <div id="results">
-    <div class="empty">
-      <div class="icon">🔍</div>
-      <p>商品名を入力して検索してください</p>
-    </div>
+    <div class="empty"><div class="icon">🔍</div><p>商品名を入力して検索してください</p></div>
   </div>
+</div>
+
+<!-- チラシ画像 -->
+<div id="pane-flyer" style="display:none">
+  <div id="flyer-list"><div class="loading">読み込み中...</div></div>
+</div>
+
+<!-- 拡大モーダル -->
+<div class="modal" id="modal" onclick="closeModal()">
+  <div class="modal-close">✕</div>
+  <img id="modal-img" src="" />
 </div>
 
 <script>
@@ -164,24 +220,32 @@ const SUPABASE_URL = "https://wydjiqortlsvbtwswckd.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5ZGppcW9ydGxzdmJ0d3N3Y2tkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NzYxOTIsImV4cCI6MjA5MDI1MjE5Mn0.8PLeUVhuUzMMTySqfinhr6Ne1UJpp_SqvSDATmAck1k";
 
 const STORE_COLORS = {
-  "タイヨー学園の森店": { color: "#e74c3c", bg: "#fdf0ef" },
-  "ブランデ研究学園店": { color: "#2980b9", bg: "#eaf4fb" },
-  "カスミ学園の森店":   { color: "#8e44ad", bg: "#f5eef8" },
+  "タイヨー学園の森店":     { color: "#e74c3c", bg: "#fdf0ef" },
+  "ブランデ研究学園店":     { color: "#2980b9", bg: "#eaf4fb" },
+  "カスミ学園の森店":       { color: "#8e44ad", bg: "#f5eef8" },
+  "カスミイーアスつくば店": { color: "#6c3483", bg: "#f0e6f6" },
+  "ロピアトナリエクレオ店": { color: "#e67e22", bg: "#fef5ec" },
+  "タイラヤつくば大穂店":   { color: "#16a085", bg: "#e8f8f5" },
 };
-const STORE_ORDER = ["タイヨー学園の森店", "ブランデ研究学園店", "カスミ学園の森店"];
+
+const TEXT_STORE_ORDER  = ["タイヨー学園の森店", "ブランデ研究学園店", "カスミ学園の森店"];
+const FLYER_STORE_ORDER = ["タイヨー学園の森店", "ブランデ研究学園店", "カスミ学園の森店",
+                           "カスミイーアスつくば店", "ロピアトナリエクレオ店", "タイラヤつくば大穂店"];
+
 const today = new Date().toISOString().slice(0, 10);
 const ago30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 const H = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
 
 // ── タブ切替 ──
 function switchTab(name) {
-  document.getElementById("pane-today").style.display  = name === "today"  ? "" : "none";
-  document.getElementById("pane-search").style.display = name === "search" ? "" : "none";
-  document.getElementById("tab-today").classList.toggle("active",  name === "today");
-  document.getElementById("tab-search").classList.toggle("active", name === "search");
+  ["today","search","flyer"].forEach(t => {
+    document.getElementById(`pane-${t}`).style.display = t === name ? "" : "none";
+    document.getElementById(`tab-${t}`).classList.toggle("active", t === name);
+  });
+  if (name === "flyer") loadFlyers();
 }
 
-// ── 今日のチラシ一覧 ──
+// ── 今日の特売 ──
 async function loadToday() {
   const el = document.getElementById("today-list");
   try {
@@ -191,7 +255,7 @@ async function loadToday() {
     ).then(r => r.json());
 
     if (!data.length) {
-      el.innerHTML = `<div class="empty"><div class="icon">📭</div><p>今日のデータはまだありません</p><p style="font-size:0.8rem;margin-top:8px;color:#bbb">scraper.pyを実行してください</p></div>`;
+      el.innerHTML = `<div class="empty"><div class="icon">📭</div><p>今日のデータはまだありません</p></div>`;
       return;
     }
 
@@ -199,15 +263,14 @@ async function loadToday() {
     for (const r of data) { (byStore[r.store] = byStore[r.store] || []).push(r); }
 
     let html = `<div class="date-badge">${today}（${data.length}品）</div>`;
-    for (const store of STORE_ORDER) {
+    for (const store of TEXT_STORE_ORDER) {
       const items = byStore[store];
       if (!items) continue;
       const c = STORE_COLORS[store] || { color: "#555", bg: "#f5f5f5" };
       html += `<div class="store-card">
         <div class="store-header" style="background:${c.bg}">
           <span class="dot" style="background:${c.color}"></span>
-          ${store}
-          <span class="count-badge">${items.length}品</span>
+          ${store}<span class="count-badge">${items.length}品</span>
         </div>`;
       for (const r of items) {
         html += `<div class="product-row">
@@ -229,7 +292,59 @@ async function loadToday() {
   }
 }
 
-// ── 検索 ──
+// ── チラシ画像 ──
+async function loadFlyers() {
+  const el = document.getElementById("flyer-list");
+  if (el.dataset.loaded) return;
+  el.innerHTML = `<div class="loading">読み込み中...</div>`;
+  try {
+    const data = await fetch(
+      `${SUPABASE_URL}/rest/v1/flyers?select=store,image_url,page_num,valid_to&order=store,page_num`,
+      { headers: H }
+    ).then(r => r.json());
+
+    const byStore = {};
+    for (const r of data) { (byStore[r.store] = byStore[r.store] || []).push(r); }
+
+    let html = `<div class="date-badge">最新のチラシ画像</div>`;
+    for (const store of FLYER_STORE_ORDER) {
+      const c = STORE_COLORS[store] || { color: "#555", bg: "#f5f5f5" };
+      const items = byStore[store];
+      html += `<div class="flyer-store-section">
+        <div class="flyer-store-title" style="background:${c.bg}">
+          <span class="dot" style="background:${c.color}"></span>${store}
+        </div>`;
+      if (items && items.length) {
+        const validText = items[0].valid_to || "";
+        html += `<div class="flyer-images">`;
+        for (const r of items) {
+          html += `<img src="${r.image_url}" alt="${store}チラシ${r.page_num}枚目"
+            onclick="openModal('${r.image_url}')" loading="lazy" />`;
+        }
+        html += `</div>`;
+        if (validText) html += `<div class="flyer-valid">📅 ${validText}</div>`;
+      } else {
+        html += `<div class="no-flyer">現在チラシ画像はありません</div>`;
+      }
+      html += `</div>`;
+    }
+    el.innerHTML = html;
+    el.dataset.loaded = "1";
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>読み込みに失敗しました</p></div>`;
+  }
+}
+
+// ── モーダル ──
+function openModal(src) {
+  document.getElementById("modal-img").src = src;
+  document.getElementById("modal").classList.add("open");
+}
+function closeModal() {
+  document.getElementById("modal").classList.remove("open");
+}
+
+// ── 価格検索 ──
 function quickSearch(kw) {
   switchTab("search");
   document.getElementById("searchInput").value = kw;
@@ -261,7 +376,7 @@ function renderSearch(kw, todayData, histData) {
   const todayMap = {}, statsMap = {};
   for (const r of todayData) { (todayMap[r.store] = todayMap[r.store] || []).push(r); }
   for (const r of histData)  { (statsMap[r.store] = statsMap[r.store] || []).push(r.price_tax); }
-  const active = STORE_ORDER.filter(s => todayMap[s] || statsMap[s]);
+  const active = TEXT_STORE_ORDER.filter(s => todayMap[s] || statsMap[s]);
   if (!active.length) {
     el.innerHTML = `<div class="empty"><div class="icon">😔</div><p>「${kw}」は見つかりませんでした</p></div>`;
     return;
@@ -308,7 +423,7 @@ function renderSearch(kw, todayData, histData) {
   el.innerHTML = html;
 }
 
-// 起動時に今日のチラシを読み込む
+// 起動時
 loadToday();
 </script>
 </body>
