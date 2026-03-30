@@ -2,7 +2,7 @@ name: 毎朝チラシ取得
 
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '30 02 * * *'
   workflow_dispatch:
 
 jobs:
